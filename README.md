@@ -2,6 +2,7 @@ Shell Program
 ========
 
 Shell Program implements a large subset of the POSIX Shell’s functionality, including:
+
    - Parse command-line input into commands to be executed
    - Execute a variety of external commands (programs) as separate processes
    - Implement a variety of shell built-in commands within the shell itself
