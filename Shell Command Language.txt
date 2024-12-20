@@ -1,0 +1,443 @@
+Shell Command Language
+This chapter contains the definition of the Shell Command Language.
+
+Shell Introduction
+Shell is a command language interpreter. This chapter describes the syntax of that command language as it is used by the Shell utility.
+
+Shell operates according to the following general overview of operations. The specific details are included in the cited sections of this chapter.
+
+Shell reads its input from standard input.
+
+Shell breaks the input into tokens: words and operators; see Token Recognition.
+
+Shell parses the input into commands (see Shell Commands).
+
+Shell performs various expansions (separately) on different parts of each command, resulting in a list of pathnames and words to be treated as a command and arguments (see Word Expansions).
+
+Shell performs redirection (see Redirection) and removes redirection operators and their operands from the parameter list.
+
+Shell executes a built-in (see Special Built-In Utilities), or executable file, giving the names of the arguments as positional parameters numbered 1 to n, and the name of the command as the positional parameter numbered 0 (see Command Search And Execution).
+
+Shell optionally waits for the command to complete and collects the exit status (see Exit Status).
+
+Quoting
+Quoting is used to remove the special meaning of certain characters or words to Shell. Quoting can be used to preserve the literal meaning of the special characters in the next paragraph, and prevent parameter expansion.
+
+The application shall quote the following characters if they are to represent themselves:
+
+|  &  ;  <  >   $   \  "  '  <space> <tab>
+The <newline> character cannot be quoted.
+
+The various quoting mechanisms are the escape character, single-quotes, and double-quotes.
+
+Escape Character (Backslash)
+A <backslash> that is not quoted shall preserve the literal value of the following character, with the exception of a <newline>. If a <newline> follows the <backslash>, Shell shall interpret this as line continuation. The <backslash> and <newline> shall be removed before splitting the input into tokens. Since the escaped <newline> is removed entirely from the input and is not replaced by any white space, it cannot serve as a token separator.
+
+Single-Quotes
+Enclosing characters in single-quotes ( '') shall preserve the literal value of each character within the single-quotes. A single-quote cannot occur within single-quotes.
+
+Double-Quotes
+Enclosing characters in double-quotes ( "") shall preserve the literal value of all characters within the double-quotes, with the exception of the characters <dollar-sign>, and <backslash>, as follows:
+
+$
+The <dollar-sign> shall retain its special meaning introducing parameter expansion (see Parameter Expansion).
+
+Tee string of characters from an enclosed "${" to the matching '}' are parsed literally.
+
+\`
+The <backslash> shall retain its special meaning as an escape character (see Escape Character (Backslash)) only when followed by one of the following characters when considered special:
+
+$  "  \  <newline>
+The application shall ensure that a double-quote is preceded by a <backslash> to be included within double-quotes.
+
+Token Recognition
+Shell shall read its input in terms of lines from stdandard input, which may be a terminal, in the case of an interactive shell.
+
+The input lines can be of unlimited length. These lines shall be parsed using two major modes: ordinary token recognition and processing of here-documents.
+
+Shell shall break its input into tokens by applying the first applicable rule below to the next character in its input. The token shall be from the current position in the input until a token is delimited according to one of the rules below; the characters forming the token are exactly those in the input, including any quoting characters. If it is indicated that a token is delimited, and no characters have been included in a token, processing shall continue until an actual token is delimited.
+
+If the end of input is recognized, the current token shall be delimited. If there is no current token, the end-of-input indicator shall be returned as the token.
+
+If the previous character was used as part of an operator and the current character is not quoted and can be used with the current characters to form an operator, it shall be used as part of that (operator) token.
+
+If the previous character was used as part of an operator and the current character cannot be used with the current characters to form an operator, the operator containing the previous character shall be delimited.
+
+If the current character is <backslash>, single-quote, or double-quote and it is not quoted, it shall affect quoting for subsequent characters up to the end of the quoted text. The rules for quoting are as described in Quoting. During token recognition no substitutions shall be actually performed, and the result token shall contain exactly the characters that appear in the input (except for <newline> joining), unmodified, including any embedded or enclosing quotes or substitution operators, between the <quotation-mark> and the end of the quoted text. The token shall not be delimited by the end of the quoted field.
+
+If the current character is an unquoted '$', Shell shall identify the start of parameter expansion (Parameter Expansion), introduced with the unquoted character sequences: '$' or "${" . Shell shall read sufficient input to determine the end of the unit to be expanded (as explained in the cited section). The token shall not be delimited by the end of the substitution.
+
+If the current character is not quoted and can be used as the first character of a new operator, the current token (if any) shall be delimited. The current character shall be used as the beginning of the next (operator) token.
+
+If the current character is an unquoted <newline>, the current token shall be delimited.
+
+If the current character is an unquoted <blank>, any token containing the previous character is delimited and the current character shall be discarded.
+
+If the previous character was part of a word, the current character shall be appended to that word.
+
+If the current character is a '#' , it and all subsequent characters up to, but excluding, the next <newline> shall be discarded as a comment. The <newline> that ends the line is not considered part of the comment.
+
+The current character is used as the start of a new word.
+
+Parameters and Variables
+A parameter can be denoted by a name, or one of the special characters listed in Special Parameters. A variable is a parameter denoted by a name.
+
+A parameter is set if it has an assigned value (null is a valid value). Once a variable is set, it can only be unset by using the unset special built-in command.
+
+Special Parameters
+Listed below are the special parameters and the values to which they shall expand. Only the values of the special parameters are listed.
+
+?
+Expands to the decimal exit status of the most recent pipeline (see Pipelines).
+
+$
+Expands to the decimal process ID of the invoked shell.
+
+!
+Expands to the decimal process ID of the most recent background command (see Asynchronous Lists (Background Commands)). For a pipeline, the process ID of $? is that of the previously executed command in the pipeline.
+
+Shell Variables
+Variables shall be initialized from the environment. If a variable is initialized from the environment, it shall be marked for export immediately; see the export special built-in.
+
+The following variables shall affect the execution of Shell:
+
+HOME
+The pathname of the user’s home directory. The contents of HOME are used in tilde expansion (see Tilde Expansion).
+
+PATH
+A string formatted as described in XBD Environment Variables, used to effect command interpretation; see Command Search and Execution.
+
+PS1
+Each time an interactive shell is ready to read a command, the value of this variable shall be written to standard error. The default value shall be "$" for regular users, and "#" for the root user.
+
+PS2
+Each time the user enters a <newline> prior to completing a command line in an interactive shell, the value of this variable shall be subjected to parameter expansion and written to standard error. The default value is ">" .
+
+PWD
+Set by the cd utility.
+
+Word Expansions
+This section describes the various expansions that are performed on words. Not all expansions are performed on every word, as explained in the following sections.
+
+The order of word expansion shall be as follows:
+
+Tilde expansion (see Tilde Expansion) and parameter expansion (see Parameter Expansion) shall be performed, beginning to end. See item 5 in Token Recognition .
+
+Quote removal (see Quote Removal) shall always be performed last.
+
+The '$' character is used to introduce parameter expansion. If an unquoted '$' is followed by a character that is either not the name of one of the special parameters (see Special Parameters), a valid first character of a variable name, or a <left-curly-bracket> ( '{'), the result is unspecified.
+
+Tilde Expansion
+A “tilde-prefix” consists of an unquoted <tilde> character at the beginning of a word, followed by all of the characters preceding the first unquoted <slash> in the word, or all the characters in the word if there is no <slash>. The characters in the tilde-prefix following the <tilde> are treated as a possible login name from the user database.
+
+If the login name is null (that is, the tilde-prefix contains only the tilde), the tilde-prefix is replaced by the value of the variable HOME, if it is set. Otherwise, the result is unspecified.
+
+If the login name is specified, the tilde-prefix shall be replaced by a pathname of the initial working directory (home directory) associated with the login name, obtained using the getpwnam() function as defined in the System Interfaces volume of POSIX.1-2008. If the system does not recognize the login name, the results are undefined.
+
+Parameter Expansion
+The format for parameter expansion is as follows:
+
+${expression}
+where expression consists of all characters until the matching '}' .
+
+The simplest form for parameter expansion is:
+
+${parameter}
+The value, if any, of parameter shall be substituted.
+
+The parameter name or symbol can be enclosed in braces, which are optional except for when parameter is followed by a character that could be interpreted as part of the name.
+
+If the parameter name or symbol is not enclosed in braces, the expansion shall use the longest valid name (see XBD Name), whether or not the symbol represented by that name exists.
+
+Quote Removal
+The quote characters ( <backslash>, single-quote, and double-quote) that were present in the original word shall be removed unless they have themselves been quoted.
+
+Redirection
+Redirection is used to open and close files for the current shell execution environment (see Shell Execution Environment) or for any command. Redirection operators can be used with numbers representing file descriptors (see XBD File Descriptor) as described below.
+
+The overall format used for redirection is:
+
+[n]redir-op word
+The number n is an optional decimal number designating the file descriptor number; the application shall ensure it is delimited from any preceding text and immediately precede the redirection operator redir-op. If n is quoted, the number shall not be recognized as part of the redirection expression. For example:
+
+echo \2>a
+writes the character 2 into file a. If any part of redir-op is quoted, no redirection expression is recognized. For example:
+
+echo 2\>a
+writes the characters 2>a to standard output. The optional number, redirection operator, and word shall not appear in the arguments provided to the command to be executed (if any).
+
+Open files are represented by decimal numbers starting with zero. The largest possible value is implementation-defined. These numbers are called “file descriptors”. The values 0, 1, and 2 have special meaning and conventional uses and are implied by certain redirection operations; they are referred to as standard input, standard output, and standard error, respectively. Programs usually take their input from standard input, and write output on standard output. Error messages are usually written on standard error. The redirection operators can be preceded by one or more digits (with no intervening <blank> characters allowed) to designate the file descriptor number.
+
+If more than one redirection operator is specified with a command, the order of evaluation is from beginning to end.
+
+A failure to open or create a file shall cause a redirection to fail.
+
+Redirecting Input
+Input redirection shall cause the file whose name results from the expansion of word to be opened for reading on the designated file descriptor, or standard input if the file descriptor is not specified.
+
+The general format for redirecting input is:
+
+[n]<word
+where the optional n represents the file descriptor number. If the number is omitted, the redirection shall refer to standard input (file descriptor 0).
+
+Redirecting Output
+The two general formats for redirecting output are:
+
+[n]>word
+[n]>|word
+where the optional n represents the file descriptor number. If the number is omitted, the redirection shall refer to standard output (file descriptor 1).
+
+Output redirection using the '>' format shall fail if the file named by the expansion of word exists. Otherwise, redirection using the '>' or ">|" operators shall cause the file whose name results from the expansion of word to be created and opened for output on the designated file descriptor, or standard output if none is specified. If the file does not exist, it shall be created; otherwise, it shall be truncated to be an empty file after being opened.
+
+Appending Redirected Output
+Appended output redirection shall cause the file whose name results from the expansion of word to be opened for output on the designated file descriptor. The file is opened as if the open() function as defined in the System Interfaces volume of POSIX.1-2008 was called with the O_APPEND flag. If the file does not exist, it shall be created.
+
+The general format for appending redirected output is as follows:
+
+[n]>>word
+where the optional n represents the file descriptor number. If the number is omitted, the redirection refers to standard output (file descriptor 1).
+
+Duplicating a File Descriptor
+The redirection operators:
+
+[n]<&word
+[n]>&word
+shall duplicate one file descriptor from another, or shall close one.
+
+If word evaluates to one or more digits, the file descriptor denoted by n, shall be made to be a copy of the file descriptor denoted by word; if the digits in word do not represent a file descriptor already open for input, a redirection error shall result.
+
+If word evaluates to '-' , file descriptor n, or standard input if n is not specified, shall be closed.
+
+If n is not specified, it shall default to 0 for the <& operator, and 1 for the >& operator.
+
+If an attempt is made to close a file descriptor that is not open, the behavior is undefined. If word evaluates to something else, the behavior is unspecified.
+
+Open File Descriptors for Reading and Writing
+The redirection operator:
+
+[n]<>word
+shall cause the file whose name is the expansion of word to be opened for both reading and writing on the file descriptor denoted by n, or standard input if n is not specified. If the file does not exist, it shall be created.
+
+Exit Status
+Each command has an exit status that can influence the behavior of other shell commands. The exit status of commands that are not utilities is documented in this section. The exit status of the standard utilities is documented in their respective sections.
+
+If a command is not found, or execution fails, the exit status shall be 127.
+
+If a command fails during word expansion or redirection, its exit status shall be greater than zero. It shall not be executed if either operation fails.
+
+If a command exits due to a signal, its exit status shall be 128+*n*, where n is the signal number.
+
+Shell Commands
+This section describes the basic structure of shell commands. The following command descriptions each describe a format of the command.
+
+A command is one of the following:
+
+Simple command (see Simple Commands)
+
+Pipeline (see Pipelines)
+
+Unless otherwise stated, the exit status of a command shall be that of the last simple command executed by the command.
+
+Simple Commands
+A “simple command” is a sequence of optional variable assignments and redirections, in any sequence, optionally followed by command words and redirections, terminated by a control operator.
+
+The following expansions, assignments, and redirections shall all be performed from the beginning of the command text to the end:
+
+The words of the command, variable assignment values, and redirection filename operands, shall be expanded.
+
+Redirections shall be performed as described in Redirection .
+
+Each variable assignment shall be evaluated to assign the corresponding value to the named parameter.
+
+If no command name results, variable assignments shall affect the current execution environment. Otherwise, the variable assignments shall be exported for the execution environment of the command and shall not affect the current execution environment (except for special built-ins).
+
+If there is a command name, execution shall continue as described in Command Search and Execution . Otherwise the command shall complete with a zero exit status
+
+Command Search and Execution
+If a simple command results in a command name and an optional list of arguments, the following actions shall be performed:
+
+If the command name does not contain any <slash> characters, the first successful step in the following sequence shall occur:
+
+If the command name matches the name of a special built-in utility, that special built-in utility shall be invoked.
+
+Otherwise, the command shall be searched for using the PATH environment variable as described in XBD Environment Variables
+
+If the search is successful, Shell executes the utility in a separate utility environment (see Shell Execution Environment) with actions equivalent to calling the execve() function as defined in the System Interfaces volume of POSIX.1-2008 with the path argument set to the pathname resulting from the search, arg0 set to the command name, and the remaining arguments set to the operands, if any.
+
+If the command name contains at least one <slash>, Shell shall execute the utility in a separate utility environment with actions equivalent to calling the execve() function defined in the System Interfaces volume of POSIX.1-2008 with the path and arg0 arguments set to the command name, and the remaining arguments set to the operands, if any.
+
+If the search is unsuccessful, or execution of the specified utility fails, the command shall fail with a non-zero exit status and write an error message to standard error.
+
+Pipelines
+A pipeline is a sequence of one or more commands separated by the control operator '|' . The standard output of all but the last command shall be connected to the standard input of the next command.
+
+The format for a pipeline is:
+
+command1 [ | command2 ...]
+The standard output of command1 shall be connected to the standard input of command2. The standard input, standard output, or both of a command shall be considered to be assigned by the pipeline before any redirection specified by redirection operators that are part of the command (see Redirection).
+
+The last command of a pipeline is either an asynchronous (background) command, or a synchronous (foreground) command.
+
+If the pipeline is terminated by a synchronous command, Shell shall wait for all commands in the pipeline to complete. If the commands in a pipeline are stopped (as by receipt of a signal), Shell shall no longer wait for it to complete, and instead treat it as a stopped background command.
+
+Exit Status
+
+The exit status of a pipeline is the exit status of the last command specified in the pipeline.
+
+Asynchronous Lists (Background Commands)
+If a command is terminated by the control operator <ampersand> ( '&'), Shell shall execute the command asynchronously in a subshell. This means that Shell shall not wait for the command to finish before executing the next command.
+
+The format for running a command in the background is:
+
+command1 & [command2 & ... ]
+Exit Status
+
+The exit status of an asynchronous list is unspecified.
+
+Sequential Lists (Foreground Commands)
+Commands that are separated by a <semicolon> ( ';') shall be executed sequentially.
+
+The format for executing commands sequentially shall be:
+
+command1 [; command2] ...
+Each command shall be expanded and executed in the order specified.
+
+Exit Status
+
+The exit status of a sequential list shall be the exit status of the last command in the list.
+
+Signals and Error Handling
+Shell shall ignore the signals SIGTSTP and SIGTOU at all times. It shall ignore the signal SIGINT except when reading command input–in which case the SIGINT signal will interrupt reading of input, causing Shell will repeat checking for background processes that have exited, and re-parsing the command input.
+
+The signal actions inherited by a non-builtin command shall be the same as those inherited by Shell from its parent (they must be restored to their original values before execution of a command).
+
+Job Control
+Each pipeline shall be executed with its own unique process group, separate from Shell or any other pipeline’s process group, called a Job. Each job is assigned a separate, unique, Job Id.
+
+If standard input is a terminal, as determined by isatty(), then the following additional behaviors will be implemented:
+
+When a Job is waited for synchronously, the corresponding process group id shall be made the foreground process group for the terminal, as described in tcsetpgrp()
+
+At all other times, Shell shall make itself the foreground process group for the terminal.
+
+Before parsing line(s) of input for commands, Shell shall (asynchronously) wait for each of the process groups corresponding to any current background jobs. When the last child process of a job exits, Shell shall print an informative message to stderr (see the skeleton code for the format of these messages).
+
+The special built-in utility fg may be used to place a background job in the foreground (and wait on it as a foreground job).
+
+The special built-in utility bg may be used to cause a stopped background job to continue running in the background.
+
+Shell Execution Environment
+A shell execution environment consists of the following:
+
+Open files inherited upon invocation of Shell.
+
+Working directory as set by cd
+
+Shell parameters that are set by variable assignment or from the System Interfaces volume of POSIX.1-2008 environment inherited by Shell when it begins (see the export special built-in)
+
+Utilities other than the special built-ins (see Special Built-In Utilities) shall be invoked in a separate environment that consists of the following. The initial value of these objects shall be the same as that for the parent shell, except as noted below.
+
+Open files inherited on invocation of Shell, and any additions specified by any redirections to the utility.
+
+Current working directory
+
+Variables with the export attribute, along with those explicitly exported for the duration of the command, shall be passed to the utility environment variables
+
+The environment of Shell process shall not be changed by the utility
+
+Special Built-In Utilities
+The following “special built-in” utilities shall be supported in Shell command language. The output of each command, if any, shall be written to standard output, subject to the normal redirection and piping possible with all commands.
+
+The term “built-in” implies that Shell can execute the utility directly and does not need to search for it.
+
+Variable assignments specified with special built-in utilities remain in effect after the built-in completes; this shall not be the case with a regular built-in or other utility.
+
+Bg
+NAME
+
+bg - run jobs in the background
+
+SYNOPSIS
+
+bg [job_id]
+DESCRIPTION
+
+The bg utility shall resume suspended jobs by running them as background jobs. If the job specified by job_id is already running, it shall have no effect.
+
+If job_id is not specified, the lowest numbered job id is used.
+
+Cd
+NAME
+
+cd - change directory
+
+SYNOPSIS
+
+cd [path]
+DESCRIPTION
+
+The cd utility shall cause Shell to change its current working directory to the specified path. If no path is specified, the Shell shall change its current working directory to the value of the $HOME variable.
+
+Exit
+NAME
+
+exit - cause Shell to exit
+
+SYNOPSIS
+
+exit [n]
+DESCRIPTION
+
+The exit utility shall cause Shell to exit with the exit status specified by the unsigned decimal integer n. If n is specified, but its value is not between 0 and 255 inclusively, the exit status is undefined.
+
+If n is not specified, the value shall be the exit value of the last (foreground) command executed, or zero if no command was executed.
+
+Export
+NAME
+
+export - set the export attribute for variables
+
+SYNOPSIS
+
+export [name[=value]]...
+DESCRIPTION
+
+Shell shall give the export attribute to the variables corresponding to the specified names, which shall cause them to be in the environment of subsequently executed commands. If the name of a variable is followed by = word, then the value of that variable shall be set to word.
+
+Fg
+NAME
+
+fg - run jobs in the foreground
+
+SYNOPSIS
+
+fg [job_id]
+DESCRIPTION
+
+The fg utility shall move a background job into the foreground. If job_id is not specified, fg will use the lowest numbered job that is available.
+
+Jobs
+NAME
+
+jobs - display jobs
+
+SYNOPSIS
+
+jobs
+DESCRIPTION
+
+The jobs utility shall display a list of all jobs known to Shell.
+
+Unset
+NAME
+
+unset - unset values and attributes of variables and functions
+
+SYNOPSIS
+
+unset [name...]
+DESCRIPTION
+
+Each variable or function specified by name shall be unset.
+
+Unsetting a variable or function that was not previously set shall not be considered an error and does not cause Shell to abort.
